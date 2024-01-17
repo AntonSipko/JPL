@@ -5,33 +5,25 @@ import telran.cars.dto.ModelDto;
 @Entity
 @Table(name="models")
 @Getter
-@Setter
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor
 public class Model {
 	@EmbeddedId
 	ModelYear modelYear;
 	@Column(nullable = false)
 	String company;
 	@Column(name="engine_power", nullable = false)
-	int enginePower;
+	Integer enginePower;
 	@Column(name="engine_capacity", nullable = false)
-	int engineCapacity;
-	public static Model of(ModelDto modelDto) {
-        Model model = new Model();
-        model.setModelYear(new ModelYear(modelDto.getName(), modelDto.getYear()));
-        model.setCompany(modelDto.getCompany());
-        model.setEnginePower(modelDto.getEnginePower());
-        model.setEngineCapacity(modelDto.getEngineCapacity());
-        return model;
-    }
-
-    public ModelDto buildDto() {
-        return new ModelDto(
-                this.getModelYear().getName(),
-                this.getModelYear().getYear(),
-                this.getCompany(),
-                this.getEnginePower(),
-                this.getEngineCapacity()
-        );
-    }
-	 
+	Integer engineCapacity;
+	public static Model of (ModelDto modelDto) {
+		ModelYear modelYear = new ModelYear(modelDto.getModelName(), modelDto.getModelYear());
+		
+		return new Model(modelYear,
+				modelDto.getCompany(), modelDto.getEnginePower(), modelDto.getEngineCapacity());
+	}
+	public ModelDto build() {
+		return new ModelDto(modelYear.getName(), modelYear.getYear(),
+				company, enginePower, engineCapacity);
+	}
 }

@@ -1,122 +1,153 @@
 package telran.cars.service;
 
-import java.util.*;
+import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import lombok.extern.java.Log;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import telran.cars.dto.*;
+import telran.cars.exceptions.*;
+import telran.cars.repo.*;
 import telran.cars.service.model.*;
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class CarsServiceImpl implements CarsService {
-HashMap<Long, CarOwner> owners = new HashMap<>();
-HashMap<String, Car> cars = new HashMap<>();
-@Override
-public PersonDto addPerson(PersonDto personDto) {
-    long id = personDto.id();
-    if (owners.containsKey(id)) {
-        throw new IllegalStateException("Person with ID " + id + " already exists");
-    }
-
-    CarOwner newCarOwner = new CarOwner(personDto);
-    owners.put(id, newCarOwner);
-
-    log.debug("Person was added: {}", personDto);
-    return newCarOwner.build();
-}
-
-@Override
-public CarDto addCar(CarDto carDto) {
-    String carNumber = carDto.number();
-    if (cars.containsKey(carNumber)) {
-        throw new IllegalStateException("Car with number " + carNumber + " already exists");
-    }
-    Car newCar = new Car(carDto);
-    cars.put(carNumber, newCar);
-    log.debug("Car was added: {}", carDto);
-    return newCar.build();
-}
-
-@Override
-public PersonDto updatePerson(PersonDto personDto) {
-    long id = personDto.id();
-    CarOwner updatedPerson = owners.replace(id, new CarOwner(personDto));
-    if (updatedPerson == null) {
-        throw new IllegalStateException("Person with ID " + id + " doesn't exist");
-    }
-
-    log.debug("Person was updated: {}", personDto);
-    return updatedPerson.build();
-}
-
-@Override
-public PersonDto deletePerson(long id) {
-    CarOwner existingOwner = owners.remove(id);
-    if (existingOwner == null) {
-        throw new IllegalStateException("Person with ID " + id + " doesn't exist");
-    }
-
-    log.debug("Person was deleted with ID: {}", id);
-    return existingOwner.build();
-}
-
-@Override
-public CarDto deleteCar(String carNumber) {
-    Car car = cars.remove(carNumber);
-    if (car == null) {
-        throw new IllegalStateException("Car with number " + carNumber + " doesn't exist");
-    }
-
-    log.debug("Car was deleted with number: {}", carNumber);
-    return car.build();
-}
-
-	
+	final CarRepo carRepo;
+	final CarOwnerRepo carOwnerRepo;
+	final ModelRepo modelRepo;
+	final TradeDealRepo tradeDealRepo;
+	@Override
+	@Transactional
+	public PersonDto addPerson(PersonDto personDto) {
+		if(carOwnerRepo.existsById(personDto.id())) {
+			throw new IllegalPersonsStateException();
+		}
+		CarOwner carOwner = CarOwner.of(personDto);
+		carOwnerRepo.save(carOwner);
+		log.debug("person {} has been saved", personDto);
+		return personDto;
+	}
 
 	@Override
-	public TradeDealDto purchase(TradeDealDto tradeDeal) {
-		CarOwner newCarOwner=owners.get(tradeDeal.personId());
-		Car car=cars.get(tradeDeal.carNumber());
-		if(newCarOwner==null) {
-				throw new IllegalStateException();
+	@Transactional
+	public CarDto addCar(CarDto carDto) {
+		if(carRepo.existsById(carDto.number())) {
+			throw new IllegalCarsStateException();
 		}
-		if(car==null) {
-				throw new IllegalStateException();
+		Model model = modelRepo.findById(new ModelYear(carDto.model(), carDto.year()))
+				.orElseThrow(() -> new ModelNotFoundException());
+		Car car = Car.of(carDto);
+		car.setModel(model);
+		carRepo.save(car);
+		log.debug("car {} has been saved", carDto);
+		return carDto;
+	}
+
+	@Override
+	@Transactional
+	public PersonDto updatePerson(PersonDto personDto) {
+		CarOwner carOwner = carOwnerRepo.findById(personDto.id())
+				.orElseThrow(() -> new PersonNotFoundException());
+		carOwner.setEmail(personDto.email());
+		return personDto;
+	}
+
+	@Override
+	@Transactional
+	public PersonDto deletePerson(long id) {
+		CarOwner carOwner=carOwnerRepo.findById(id).orElseThrow(()->new PersonNotFoundException());
+		Car car=carRepo.findByCarOwnerId(id);
+		if(car!=null) {
+			car.setCarOwner(null);	
+			carRepo.save(car);
 		}
-		CarOwner previousOwner=cars.get(tradeDeal.carNumber()).getOwner();
-		if(previousOwner!=null) {
-			owners.get(previousOwner).getCars().remove(car);
-			cars.get(car).setOwner(newCarOwner);
-			owners.get(tradeDeal.personId()).getCars().add(car);
-		}
-		return tradeDeal;
+		carOwnerRepo.deleteById(id);
 		
+		
+		// TODO 
+		//HW #63
+		//find Car having being deleted owner
+		//If such car exists, set null as the car owner
+		//after that delete by the method deleteById from carOwnerRepo
+		return carOwner.build();
+		
+	}
+
+	@Override
+	public CarDto deleteCar(String carNumber) {
+		Car car=carRepo.findById(carNumber).orElseThrow(()->new CarNotFoundException());
+		List<TradeDeal> tradeDeals=tradeDealRepo.findByCarNumber(carNumber);
+		tradeDeals.forEach(t->tradeDealRepo.delete(t));
+		carRepo.delete(car);
+		CarDto carDto=car.build();
+		log.debug("car {} has been deleted", carDto);
+		// TODO 
+		//HW #63 
+		// find all TradeDeal entities for a given Car
+		// delete all such entities
+		// delete by the method deleteById from CarRepo
+		return carDto;
+	}
+
+	@Override
+	public TradeDealDto purchase(TradeDealDto tradeDealDto) {
+		Car car = carRepo.findById(tradeDealDto.carNumber())
+				.orElseThrow(() -> new CarNotFoundException());
+		CarOwner carOwner = null;
+		Long personId = tradeDealDto.personId();
+		if ( personId != null) {
+			carOwner = carOwnerRepo.findById(personId)
+					.orElseThrow(() -> new PersonNotFoundException());
+			if(car.getCarOwner().getId() == personId) {
+				throw new TradeDealIllegalStateException();
+			}
+		}
+		TradeDeal tradeDeal = new TradeDeal();
+		tradeDeal.setCar(car);
+		tradeDeal.setCarOwner(carOwner);
+		tradeDeal.setDate(LocalDate.parse(tradeDealDto.date()));
+		return tradeDealDto;
 	}
 
 	@Override
 	public List<CarDto> getOwnerCars(long id) {
-		CarOwner carOwner=owners.get(id);
-		List<CarDto>ownersCars=new ArrayList<>();
-		if(carOwner==null) {
-		
-				throw new IllegalStateException();
-			
-		}
-		for(Car car:carOwner.getCars()) {
-			ownersCars.add(car.build());
-		}
-		return ownersCars;
+		// Not Implemented yet
+		return null;
 	}
 
 	@Override
 	public PersonDto getCarOwner(String carNumber) {
-		Car car=cars.get(carNumber);
-		if(car==null) {
-				throw new IllegalStateException();
+		// Not Implemented yet
+		return null;
+	}
+
+	@Override
+	public List<String> mostPopularModels() {
+		// Not Implemented yet
+		
+		return null;
+	}
+
+	@Override
+	@Transactional
+	public ModelDto addModel(ModelDto modelDto) {
+		ModelYear modelYear = new ModelYear(modelDto.getModelName(),modelDto.getModelYear());
+		if(modelRepo.existsById(modelYear)) {
+			throw new IllegalModelStateException();
+			
 		}
-		return car.getOwner().build();
+		Model model=Model.of(modelDto);
+		modelRepo.save(model);
+		log.debug("model {} has been saved", modelDto);
+		
+		
+		// TODO Auto-generated method stub
+		// HW #63 Write the method similar to the method addPerson
+		return modelDto;
 	}
 
 }
