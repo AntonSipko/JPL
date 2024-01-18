@@ -61,6 +61,9 @@ public class CarsServiceImpl implements CarsService {
 	public PersonDto deletePerson(long id) {
 		CarOwner carOwner=carOwnerRepo.findById(id).orElseThrow(()->new PersonNotFoundException());
 		Car car=carRepo.findByCarOwnerId(id);
+		 List<TradeDeal> tradeDeals = tradeDealRepo.findByCarNumber(car.getNumber());
+		    tradeDeals.forEach(tradeDealRepo::delete);
+		
 		if(car!=null) {
 			car.setCarOwner(null);	
 			carRepo.save(car);

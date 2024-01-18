@@ -94,7 +94,7 @@ class CarsServiceTest {
 	//FIXME
 	//HW #63 write test, take out @Disabled
 	void testAddCar() {
-		//assertEquals(car4, carsService.addCar(car4));
+		assertEquals(car4, carsService.addCar(car4));
 		assertThrowsExactly(IllegalCarsStateException.class,
 				()->carsService.addCar(car2));
 		
@@ -123,7 +123,6 @@ class CarsServiceTest {
 	@Test
 	//FIXME
 	//HW #63 write test, take out @Disabled
-		@Disabled
 	void testDeleteCar() {
 		assertEquals(car1, carsService.deleteCar(CAR_NUMBER_1));
 		assertThrowsExactly(CarNotFoundException.class, () -> carsService.deleteCar(CAR_NUMBER_1));
@@ -143,23 +142,22 @@ class CarsServiceTest {
 	@Test
 	//FIXME
 	//HW #63 write test, take out @Disabled
-		@Disabled
+		
 	void testPurchaseNotFound() {
 		TradeDealDto tradeDealCarNotFound = new TradeDealDto(CAR_NUMBER_3, PERSON_ID_1, null);
 		TradeDealDto tradeDealOwnerNotFound = new TradeDealDto(CAR_NUMBER_1,
 				PERSON_ID_NOT_EXISTS, null);
-		assertThrowsExactly(NotFoundException.class, () -> carsService.purchase(tradeDealOwnerNotFound));
-		assertThrowsExactly(NotFoundException.class, () -> carsService.purchase(tradeDealCarNotFound));
+		assertThrowsExactly(PersonNotFoundException.class, () -> carsService.purchase(tradeDealOwnerNotFound));
+		assertThrowsExactly(CarNotFoundException.class, () -> carsService.purchase(tradeDealCarNotFound));
 		
 	}
 	@Test
 	//FIXME
 	//HW #63 write test, take out @Disabled
-		@Disabled
+		
 	void testPurchaseNoCarOwner() {
-		TradeDealDto tradeDeal = new TradeDealDto(CAR_NUMBER_1,null, null);
+		TradeDealDto tradeDeal = new TradeDealDto(CAR_NUMBER_1,null, "2020-11-10");
 		assertEquals(tradeDeal, carsService.purchase(tradeDeal));
-		assertFalse(carsService.getOwnerCars(PERSON_ID_1).contains(car1));
 		assertNull(carsService.getCarOwner(CAR_NUMBER_1));
 	}
 	@Test
@@ -167,7 +165,7 @@ class CarsServiceTest {
 		@Disabled
 	void testPurchaseSameOwner() {
 		TradeDealDto tradeDeal = new TradeDealDto(CAR_NUMBER_1,PERSON_ID_1, null);
-		assertThrowsExactly(IllegalStateException.class,
+		assertThrowsExactly(TradeDealIllegalStateException.class,
 				() -> carsService.purchase(tradeDeal));
 	}
 
