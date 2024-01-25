@@ -5,12 +5,15 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import telran.cars.dto.CarDto;
 import telran.cars.dto.CarState;
+
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import jakarta.persistence.*;
 @Entity
 @Getter
 @Table(name="cars")
 @NoArgsConstructor
-
 public class Car {
 	@Id
 	@Column(name="car_number")
@@ -23,6 +26,7 @@ public class Car {
 	@ManyToOne
 	@JoinColumn(name="owner_id", nullable=true)
 	@Setter
+	@OnDelete(action = OnDeleteAction.SET_NULL)
 	CarOwner carOwner;
 	String color;
 	@Setter
@@ -30,6 +34,7 @@ public class Car {
 	@Enumerated(EnumType.STRING) // value in the table will be a string (by default a number)
 	@Column(name="car_state")
 	CarState state;
+	
 	
 	public static Car of(CarDto carDto) {
 		return new Car(carDto.number(),  carDto.color(), carDto.kilometers(), carDto.state());
@@ -42,6 +47,10 @@ public class Car {
 		this.color = color;
 		this.kilometers = kilometers;
 		this.state = state;
+	}
+	@Override
+	public String toString() {
+		return "Car [number=" + number + ", color=" + color + ", kilometers=" + kilometers + ", state=" + state + "]";
 	}
 	
 	
